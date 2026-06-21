@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="brand-logo">Z</div>
+      <div>
+        <div class="brand-name">ZeroTrust</div>
+        <div class="brand-sub">Network Access</div>
+      </div>
+    </div>
+
+    <div class="auth-title">Welcome back</div>
+    <div class="auth-sub">Sign in to your Zero Trust workspace.</div>
+
+    <div id="err" class="error-msg" style="display:none"></div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input class="input" type="email" id="email" autocomplete="email" required placeholder="you@company.com" />
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input class="input" type="password" id="password" autocomplete="current-password" required placeholder="••••••••" />
+      </div>
+
+      <button class="btn" type="submit" id="submitBtn">Sign in</button>
+    </form>
+
+    <div class="auth-foot">
+      Don't have an account? <a href="register.html">Create one</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+<script>
+const form = document.getElementById('loginForm');
+const err = document.getElementById('err');
+const btn = document.getElementById('submitBtn');
+
+// ✅ already logged in → redirect
+if (Auth.token()) location.href = 'dashboard.html';
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    // ✅ DIRECT FETCH (NOT api()) → login does NOT require token
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+
+    // ✅ FIX: your backend returns "token"
+    const token = data.token;
+
+    if (!token) throw new Error('No token returned by server');
+
+    Auth.set(token);
+    Auth.setEmail(data.user?.email || email);
+
+    location.href = 'dashboard.html';
+
+  } catch (e2) {
+    err.textContent = e2.message || 'Login failed';
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+};
+</script>
+
+</body>
+</html>

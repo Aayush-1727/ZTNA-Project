@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Devices · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<script src="app.js"></script>
+
+<script>
+mountChrome('devices', 'Devices', 'Device intelligence and risk classification');
+
+const content = document.getElementById('content');
+
+function deviceIconSvg(kind) {
+  if (kind === 'smartphone') return svg(`<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 18h.01"/>`);
+  if (kind === 'terminal') return svg(`<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>`);
+  return svg(`<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>`);
+}
+
+async function load() {
+  try {
+    const logs = await api('/api/auth/logs').catch(() => []);
+
+    // ✅ FIX: safe parsing
+    const logsArr = Array.isArray(logs) ? logs : [];
+
+    const groups = new Map();
+
+    logsArr.forEach(l => {
+      const ua = l.device || 'unknown';
+
+      const time = l.createdAt || l.date; // ✅ FIX
+
+      if (!groups.has(ua)) {
+        groups.set(ua, {
+          ua,
+          count: 0,
+          ips: new Set(),
+          last: time
+        });
+      }
+
+      const g = groups.get(ua);
+
+      g.count++;
+
+      if (l.ip) g.ips.add(l.ip);
+
+      // ✅ FIX: safe date compare
+      if (time && new Date(time) > new Date(g.last)) {
+        g.last = time;
+      }
+    });
+
+    const devices = [...groups.values()].sort((a,b)=>b.count-a.count);
+
+    const maxCount = Math.max(...devices.map(d=>d.count), 1);
+
+    content.innerHTML = `
+      <div class="grid grid-3" style="margin-bottom:20px;">
+        ${statCard({ label:'Unique Devices', value: devices.length, icon: iconDevice() })}
+        ${statCard({ label:'Total Sessions', value: logsArr.length, icon: iconActivity() })}
+        ${statCard({ label:'High Risk', value: devices.filter(d=>d.ips.size>2).length, icon: iconAlert() })}
+      </div>
+
+      <div class="grid grid-2">
+        ${
+          devices.map(d => {
+            const info = parseDevice(d.ua);
+
+            const risk = d.ips.size > 2
+              ? 'HIGH'
+              : d.ips.size === 2
+              ? 'MEDIUM'
+              : 'LOW';
+
+            const pct = Math.round((d.count / maxCount) * 100);
+
+            return `
+              <div class="device-card">
+                <div class="device-head">
+                  <div class="device-icon">${deviceIconSvg(info.icon)}</div>
+
+                  <div style="flex:1;min-width:0;">
+                    <div class="device-name">${escapeHtml(info.label)}</div>
+
+                    <div class="device-meta cell-mono" title="${escapeHtml(d.ua)}">
+                      ${escapeHtml(d.ua.slice(0,60))}
+                      ${d.ua.length>60?'…':''}
+                    </div>
+                  </div>
+
+                  <span class="risk-badge risk-${risk}">${risk}</span>
+                </div>
+
+                <div class="usage-bar">
+                  <div class="usage-fill" style="width:${pct}%"></div>
+                </div>
+
+                <div class="device-stats">
+                  <span>${d.count} sessions</span>
+                  <span>${d.ips.size} IP${d.ips.size===1?'':'s'}</span>
+                  <span>${fmtTime(d.last)}</span>
+                </div>
+              </div>
+            `;
+          }).join('')
+          || `<div class="empty" style="grid-column:1/-1;">No devices recorded yet</div>`
+        }
+      </div>
+    `;
+
+  } catch (e) {
+    content.innerHTML = `
+      <div class="card">
+        <div class="warn-item danger">
+          <span class="warn-icon">${iconAlert()}</span>
+          <span>${escapeHtml(e.message)}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+load();
+setInterval(load, 8000);
+</script>
+
+</body>
+</html>

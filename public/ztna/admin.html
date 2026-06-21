@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<script src="app.js"></script>
+
+<script>
+mountChrome('admin', 'Admin Analytics', 'System-wide intelligence and distribution');
+
+const content = document.getElementById('content');
+
+// ================= REAL PIE CHART (🔥 ADDED ONLY THIS) =================
+function drawPie(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  const total = data.reduce((s, x) => s + x.v, 0) || 1;
+
+  let start = 0;
+
+  data.forEach((d, i) => {
+    const slice = (d.v / total) * 2 * Math.PI;
+
+    ctx.beginPath();
+    ctx.moveTo(100, 100);
+    ctx.arc(100, 100, 80, start, start + slice);
+    ctx.fillStyle = `hsl(${i * 60}, 70%, 60%)`;
+    ctx.fill();
+
+    start += slice;
+  });
+}
+
+async function load() {
+  try {
+    const [logs, profile] = await Promise.all([
+      api('/api/auth/logs').catch(() => []),
+      api('/api/auth/profile').catch(() => ({}))
+    ]);
+
+    const logsArr = Array.isArray(logs) ? logs : [];
+
+    // ================= IP DATA =================
+    const ipMap = new Map();
+    logsArr.forEach(l => {
+      if (l.ip) ipMap.set(l.ip, (ipMap.get(l.ip) || 0) + 1);
+    });
+
+    const ipSlices = [...ipMap.entries()]
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,8)
+      .map(([l,v]) => ({ l, v }));
+
+    // ================= BROWSER DATA =================
+    const browserMap = new Map();
+    logsArr.forEach(l => {
+      const b = parseDevice(l.device || '').browser;
+      browserMap.set(b, (browserMap.get(b) || 0) + 1);
+    });
+
+    const browserSlices = [...browserMap.entries()].map(([l,v]) => ({ l, v }));
+
+    // ================= TODAY =================
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const todayCount = logsArr.filter(l => {
+      const time = l.createdAt || l.date;
+      return time && new Date(time) >= today;
+    }).length;
+
+    content.innerHTML = `
+      <div class="grid grid-4" style="margin-bottom:20px;">
+        ${statCard({ label:'Total Events', value: logsArr.length })}
+        ${statCard({ label:'Unique IPs', value: ipMap.size })}
+        ${statCard({ label:'Today', value: todayCount })}
+        ${statCard({ label:'Operator', value: `<span style="font-size:14px;">${escapeHtml(profile.email || Auth.email() || '—')}</span>` })}
+      </div>
+
+      <div class="grid grid-2" style="margin-bottom:20px;">
+        
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">IP Distribution</div>
+              <div class="card-sub">Top ${ipSlices.length} source addresses</div>
+            </div>
+          </div>
+          <canvas id="ipChart" width="200" height="200"></canvas>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Browser Mix</div>
+              <div class="card-sub">User-agent breakdown</div>
+            </div>
+          </div>
+          <canvas id="browserChart" width="200" height="200"></canvas>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">System Summary</div>
+            <div class="card-sub">Aggregated posture across the workspace</div>
+          </div>
+          <span class="risk-badge risk-LOW"><span class="pulse-dot"></span>Operational</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Source IP</th>
+                <th>Sessions</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${
+                ipSlices.length
+                ? ipSlices.map(s => `
+                  <tr>
+                    <td class="cell-mono">${escapeHtml(s.l)}</td>
+                    <td>${s.v}</td>
+                    <td>
+                      <div class="usage-bar" style="max-width:240px;">
+                        <div class="usage-fill" style="width:${Math.round((s.v / (logsArr.length || 1)) * 100)}%"></div>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')
+                : `<tr><td colspan="3"><div class="empty">No traffic yet</div></td></tr>`
+              }
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+    `;
+
+    // ================= DRAW CHARTS =================
+    drawPie("ipChart", ipSlices);
+    drawPie("browserChart", browserSlices);
+
+  } catch (e) {
+    content.innerHTML = `
+      <div class="card">
+        <div class="warn-item danger">
+          <span class="warn-icon">${iconAlert()}</span>
+          <span>${escapeHtml(e.message)}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+load();
+setInterval(load, 10000);
+</script>
+
+</body>
+</html>

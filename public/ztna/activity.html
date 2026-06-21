@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Activity · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<script src="app.js"></script>
+
+<script>
+mountChrome('activity', 'Activity', 'Authentication requests, sessions, and trends');
+
+const content = document.getElementById('content');
+
+function bucketByHour(logs) {
+  const map = new Map();
+  const now = new Date();
+
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+    const key = d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()+'-'+d.getHours();
+    map.set(key, { l: d.getHours().toString().padStart(2,'0')+':00', v: 0 });
+  }
+
+  logs.forEach(l => {
+    const time = l.createdAt || l.date; // ✅ FIX
+    if (!time) return;
+
+    const d = new Date(time);
+    const key = d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate()+'-'+d.getHours();
+
+    if (map.has(key)) map.get(key).v += 1;
+  });
+
+  return [...map.values()];
+}
+
+async function load() {
+  try {
+    const logs = await api('/api/auth/logs').catch(() => []);
+
+    // ✅ FIX: safe parsing
+    const logsArr = Array.isArray(logs) ? logs : [];
+
+    const series = bucketByHour(logsArr);
+    const peak = Math.max(...series.map(s=>s.v), 0);
+
+    content.innerHTML = `
+      <div class="grid grid-4" style="margin-bottom:20px;">
+        ${statCard({ label:'Total Requests', value: logsArr.length, icon: iconActivity() })}
+        ${statCard({ label:'Peak / hour', value: peak, icon: iconClock() })}
+        ${statCard({ label:'Last 12h', value: series.reduce((s,x)=>s+x.v,0), icon: iconActivity() })}
+        ${statCard({ label:'Status', value: '<span style="font-size:18px;"><span class="pulse-dot"></span>Streaming</span>', icon: iconCheck() })}
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Requests over time</div>
+            <div class="card-sub">Last 12 hours, hourly buckets · auto-refresh 5s</div>
+          </div>
+        </div>
+        <div class="chart-wrap">${lineChart(series, { color:'#818cf8', height: 260 })}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Live Logs</div>
+            <div class="card-sub">${logsArr.length} entries</div>
+          </div>
+          <span class="risk-badge risk-LOW"><span class="pulse-dot"></span>Live</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>IP</th>
+                <th>Device</th>
+                <th>Browser</th>
+                <th>OS</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${
+                logsArr.slice(0, 50).map(l => {
+                  const d = parseDevice(l.device || '');
+                  const time = l.createdAt || l.date; // ✅ FIX
+
+                  return `
+                    <tr>
+                      <td>${fmtTime(time)}</td>
+                      <td class="cell-mono">${escapeHtml(l.ip || '—')}</td>
+                      <td class="cell-mono" title="${escapeHtml(l.device || '')}">
+                        ${escapeHtml((l.device || '').slice(0,40))}
+                        ${(l.device || '').length > 40 ? '…' : ''}
+                      </td>
+                      <td>${escapeHtml(d.browser)}</td>
+                      <td>${escapeHtml(d.os)}</td>
+                    </tr>
+                  `;
+                }).join('')
+                || `<tr><td colspan="5"><div class="empty">No logs yet</div></td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    content.innerHTML = `
+      <div class="card">
+        <div class="warn-item danger">
+          <span class="warn-icon">${iconAlert()}</span>
+          <span>${escapeHtml(e.message)}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+load();
+setInterval(load, 5000);
+</script>
+
+</body>
+</html>

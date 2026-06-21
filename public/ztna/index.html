@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ZeroTrust</title>
+
+  <script>
+    // ✅ safe redirect based on auth
+    const token = localStorage.getItem('ztna_token');
+
+    if (token) {
+      window.location.href = 'dashboard.html';
+    } else {
+      window.location.href = 'login.html';
+    }
+  </script>
+
+</head>
+<body></body>
+</html>

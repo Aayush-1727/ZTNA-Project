@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Create account · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="brand-logo">Z</div>
+      <div>
+        <div class="brand-name">ZeroTrust</div>
+        <div class="brand-sub">Network Access</div>
+      </div>
+    </div>
+
+    <div class="auth-title">Create your account</div>
+    <div class="auth-sub">Set up secure, identity-aware network access in minutes.</div>
+
+    <div id="err" class="error-msg" style="display:none"></div>
+
+    <form id="regForm">
+      <div class="field">
+        <label>Email</label>
+        <input class="input" type="email" id="email" required placeholder="you@company.com" />
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input class="input" type="password" id="password" required placeholder="At least 8 characters" minlength="8" />
+      </div>
+
+      <button class="btn" type="submit" id="submitBtn">Create account</button>
+    </form>
+
+    <div class="auth-foot">
+      Already have one? <a href="login.html">Sign in</a>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+<script>
+const form = document.getElementById('regForm');
+const err = document.getElementById('err');
+const btn = document.getElementById('submitBtn');
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  try {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    // ✅ FIX: direct fetch (no token needed)
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: 'POST',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.message || 'Registration failed');
+
+    // ✅ your backend does NOT return token → redirect to login
+    alert(data.message || "Account created successfully");
+
+    location.href = 'login.html';
+
+  } catch (e2) {
+    err.textContent = e2.message || 'Registration failed';
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create account';
+  }
+};
+</script>
+
+</body>
+</html>

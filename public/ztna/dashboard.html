@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard · ZeroTrust</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+<script src="app.js"></script>
+
+<script>
+mountChrome('dashboard', 'Overview', 'Real-time trust posture across your perimeter');
+
+const content = document.getElementById('content');
+
+async function load() {
+  try {
+    const [profile, protectedRes, logs] = await Promise.all([
+      api('/api/auth/profile'),
+      api('/api/auth/protected'),
+      api('/api/auth/logs')
+    ]);
+
+    if (profile.email) Auth.setEmail(profile.email);
+
+    // ✅ CORRECT (your backend returns array)
+    const logsArr = Array.isArray(logs) ? logs : [];
+
+    const warnings = protectedRes.warnings || [];
+    const risk = protectedRes.risk || riskFromWarnings(warnings.length);
+
+    const score = trustScoreFrom(logsArr.length, warnings.length);
+
+    const uniqueIps = new Set(logsArr.map(l => l.ip)).size;
+    const uniqueDevices = new Set(logsArr.map(l => l.device)).size;
+
+    content.innerHTML = `
+      <div class="grid grid-hero" style="margin-bottom:20px;">
+        
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Trust Posture</div>
+              <div class="card-sub">Composite score from session signals</div>
+            </div>
+            <span class="risk-badge risk-${risk}">${risk}</span>
+          </div>
+
+          <div class="trust-wrap">
+            ${trustRing(score)}
+          </div>
+
+          <div style="display:flex; justify-content:space-around; margin-top:8px; font-size:12px;">
+            <div>IP <span>${protectedRes.ip || '—'}</span></div>
+            <div>Device <span>${parseDevice(protectedRes.device || '').label}</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="grid grid-3" style="margin-bottom:20px;">
+            ${statCard({ label:'Total Logs', value: logsArr.length })}
+            ${statCard({ label:'Unique IPs', value: uniqueIps })}
+            ${statCard({ label:'Unique Devices', value: uniqueDevices })}
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">Anomaly Warnings</div>
+              <div class="card-sub">${warnings.length} active</div>
+            </div>
+
+            ${
+              warnings.length === 0
+                ? `<div class="empty">No anomalies detected</div>`
+                : warnings.map(w => `
+                  <div class="warn-item">
+                    ${iconAlert()} ${w}
+                  </div>`).join('')
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">Recent Activity</div>
+            <div class="card-sub">Latest sessions</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>IP</th>
+                <th>Device</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${
+                logsArr.length > 0
+                ? logsArr.slice(0, 8).map(l => `
+                  <tr>
+                    <td>${fmtTime(l.createdAt || l.date)}</td>
+                    <td>${l.ip || '—'}</td>
+                    <td>${parseDevice(l.device || '').label}</td>
+                  </tr>
+                `).join('')
+                : `<tr><td colspan="3">No logs yet</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+  } catch (e) {
+    console.error("Dashboard error:", e);
+
+    content.innerHTML = `
+      <div class="card">
+        <div class="warn-item">
+          ${iconAlert()} API Failed — check backend
+        </div>
+      </div>
+    `;
+  }
+}
+
+// ✅ SAFE REFRESH
+load();
+setInterval(load, 15000);
+
+</script>
+
+</body>
+</html>
