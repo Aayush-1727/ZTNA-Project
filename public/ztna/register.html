@@ -6,6 +6,7 @@
 <title>Create account · ZeroTrust</title>
 <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
 
 <div class="auth-wrap">
@@ -20,26 +21,57 @@
     </div>
 
     <div class="auth-title">Create your account</div>
-    <div class="auth-sub">Set up secure, identity-aware network access in minutes.</div>
+    <div class="auth-sub">
+      Set up secure, identity-aware network access in minutes.
+    </div>
 
     <div id="err" class="error-msg" style="display:none"></div>
 
     <form id="regForm">
+
+      <div class="field">
+        <label>Name</label>
+        <input
+          class="input"
+          type="text"
+          id="name"
+          required
+          placeholder="Your Name"
+        />
+      </div>
+
       <div class="field">
         <label>Email</label>
-        <input class="input" type="email" id="email" required placeholder="you@company.com" />
+        <input
+          class="input"
+          type="email"
+          id="email"
+          required
+          placeholder="you@company.com"
+        />
       </div>
 
       <div class="field">
         <label>Password</label>
-        <input class="input" type="password" id="password" required placeholder="At least 8 characters" minlength="8" />
+        <input
+          class="input"
+          type="password"
+          id="password"
+          required
+          minlength="8"
+          placeholder="Minimum 8 characters"
+        />
       </div>
 
-      <button class="btn" type="submit" id="submitBtn">Create account</button>
+      <button class="btn" type="submit" id="submitBtn">
+        Create account
+      </button>
+
     </form>
 
     <div class="auth-foot">
-      Already have one? <a href="login.html">Sign in</a>
+      Already have one?
+      <a href="login.html">Sign in</a>
     </div>
 
   </div>
@@ -48,45 +80,76 @@
 <script src="app.js"></script>
 
 <script>
-const form = document.getElementById('regForm');
-const err = document.getElementById('err');
-const btn = document.getElementById('submitBtn');
+
+const form = document.getElementById("regForm");
+const err = document.getElementById("err");
+const btn = document.getElementById("submitBtn");
 
 form.onsubmit = async (e) => {
-  e.preventDefault();
 
-  err.style.display = 'none';
-  btn.disabled = true;
-  btn.textContent = 'Creating…';
+    e.preventDefault();
 
-  try {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+    err.style.display = "none";
 
-    // ✅ FIX: direct fetch (no token needed)
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
-      method: 'POST',
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    btn.disabled = true;
+    btn.textContent = "Creating...";
 
-    const data = await res.json();
+    try {
 
-    if (!res.ok) throw new Error(data.message || 'Registration failed');
+        const name = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
 
-    // ✅ your backend does NOT return token → redirect to login
-    alert(data.message || "Account created successfully");
+        const res = await fetch(`${API_BASE}/api/auth/register`, {
 
-    location.href = 'login.html';
+            method: "POST",
 
-  } catch (e2) {
-    err.textContent = e2.message || 'Registration failed';
-    err.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create account';
-  }
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                name,
+                email,
+                password
+
+            })
+
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+
+            throw new Error(data.message || "Registration failed");
+
+        }
+
+        alert(data.message || "Account created successfully");
+
+        location.href = "login.html";
+
+    }
+
+    catch (error) {
+
+        err.innerText = error.message;
+
+        err.style.display = "block";
+
+    }
+
+    finally {
+
+        btn.disabled = false;
+
+        btn.textContent = "Create account";
+
+    }
+
 };
+
 </script>
 
 </body>

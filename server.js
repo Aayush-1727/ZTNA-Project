@@ -10,31 +10,35 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ================= DB CONNECT =================
+// ================= DATABASE =================
 mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB connected"))
-.catch(err => console.log(err));
+.then(() => {
+    console.log("MongoDB connected");
+})
+.catch((err) => {
+    console.log(err);
+});
 
 // ================= ROUTES =================
 const authRoutes = require("./routes/auth");
+const adminRoutes = require("./routes/admin");
+const incidentRoutes = require("./routes/incident");
+
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/incidents", incidentRoutes);
 
-// ================= SERVE FRONTEND =================
-
-// 👉 serve public folder
+// ================= FRONTEND =================
 app.use(express.static(path.join(__dirname, "public")));
-
-// 👉 serve /ztna folder directly
 app.use("/ztna", express.static(path.join(__dirname, "public/ztna")));
 
-// 👉 default route → redirect to ztna
 app.get("/", (req, res) => {
-  res.redirect("/ztna");
+    res.redirect("/ztna");
 });
 
 // ================= START SERVER =================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
